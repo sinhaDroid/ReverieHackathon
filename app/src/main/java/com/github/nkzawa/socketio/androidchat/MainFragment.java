@@ -119,6 +119,7 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
         mSocket.on("user left", onUserLeft);
         mSocket.on("typing", onTyping);
         mSocket.on("stop typing", onStopTyping);
+        mSocket.on("open_lock", onOpenLock);
         mSocket.connect();
 
         startSignIn();
@@ -165,6 +166,8 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
         mSocket.off("user left", onUserLeft);
         mSocket.off("typing", onTyping);
         mSocket.off("stop typing", onStopTyping);
+
+        mSocket.off("open_lock", onOpenLock);
 
         if (mTextToSpeech != null) {
             mTextToSpeech.stop();
@@ -278,7 +281,29 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
                 updateText(mInputMessageView, voiceText);
 //                mInputMessageView.setText(voiceText);
 
-                if (!mInputMessageView.getText().toString().equals("")) {
+                if (!voiceText.isEmpty()) {
+
+                    if (!TextUtils.isEmpty(passcode)) {
+
+                        if (voiceText.contains(passcode)) {
+                            //TODO: Open the Door
+                            unlockLock();
+                            speakOut(getDoorMsg(2));
+                            passcode = null;
+                        } else {
+
+                            if(tryAgain>0){
+                                speakOut(getDoorMsg(3));
+                                tryAgain = 0;
+                            }else{
+                                passcode = null;
+                                speakOut(getDoorMsg(4));
+                            }
+                        }
+
+                        return;
+                    }
+
                     attemptSend();
                 } else {
                     Toast.makeText(getActivity(), "Enter input...", Toast.LENGTH_SHORT).show();
@@ -384,13 +409,11 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
         addMessage(mUsername, message);
 
         // perform the sending message attempt.
-        if(message.contains("8844"))
-            unlockLock();
         mSocket.emit("new message", message);
     }
 
     private void unlockLock() {
-        TTLockClient.getDefault().controlLock(ControlAction.UNLOCK, Constants.LOCK_URL, Constants.LOCK_MAC, new ControlLockCallback(){
+        TTLockClient.getDefault().controlLock(ControlAction.UNLOCK, Constants.LOCK_URL, Constants.LOCK_MAC, new ControlLockCallback() {
 
             @Override
             public void onControlLockSuccess(int lockAction, int battery, int uniqueId) {
@@ -598,6 +621,23 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
         }
     };
 
+    private String passcode;
+    private int tryAgain = 0;
+
+    private Emitter.Listener onOpenLock = new Emitter.Listener() {
+        @Override
+        public void call(final Object... args) {
+            getActivity().runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    passcode = (String) args[0];
+                    tryAgain = 1;
+                    speakOut(getDoorMsg(1));
+                }
+            });
+        }
+    };
+
     //voice
     private void startVoiceToTextService() {
         Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
@@ -687,6 +727,35 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
             map.put(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "UniqueID");
             mTextToSpeech.speak(msg, TextToSpeech.QUEUE_FLUSH, map);
         }
+    }
+
+    private String getDoorMsg(int type) {
+
+        //For Hindi
+        if (langs == 1) {
+            switch (type) {
+                case 1:
+                    return "कृपया अपना पासवर्ड बताएं";
+                case 2:
+                    return "दरवाजा खुल रहा है";
+                case 3:
+                    return "कृपया सही पास कोड बताएं";
+                default:
+                    return "गलत पासकोड कृपया दोबारा कोशिश करें";
+            }
+        }
+
+        switch (type) {
+            case 1:
+                return "Please tell your passcode.";
+            case 2:
+                return "Unlocking the door.";
+            case 3:
+                return "Please tell correct passcode!";
+            default:
+                return "Wrong passcode, please try again.";
+        }
+
     }
 }
 
