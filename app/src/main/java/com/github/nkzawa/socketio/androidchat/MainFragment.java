@@ -1,6 +1,5 @@
 package com.github.nkzawa.socketio.androidchat;
 
-import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
@@ -89,7 +88,6 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
     public void onAttach(Context context) {
         super.onAttach(context);
         mAdapter = new MessageAdapter(context, mMessages);
-        }
     }
 
 
