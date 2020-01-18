@@ -26,9 +26,12 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -37,6 +40,7 @@ import com.ttlock.bl.sdk.api.TTLockClient;
 import com.ttlock.bl.sdk.callback.ControlLockCallback;
 import com.ttlock.bl.sdk.constant.ControlAction;
 import com.ttlock.bl.sdk.entity.LockError;
+import com.github.nkzawa.socketio.androidchat.TTS.LanguageModel;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -65,6 +69,7 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
 
     private static final int REQ_CODE_VOICE_IN = 143;
 
+    private Spinner spinnerLang;
     private RecyclerView mMessagesView;
     private EditText mInputMessageView;
     private List<Message> mMessages = new ArrayList<Message>();
@@ -171,11 +176,41 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
     public void onViewCreated(View view, Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
+        spinnerLang = view.findViewById(R.id.lngSpinner);
+
         mMessagesView = view.findViewById(R.id.messages);
         mMessagesView.setLayoutManager(new LinearLayoutManager(getActivity()));
         mMessagesView.setAdapter(mAdapter);
 
         mInputMessageView = view.findViewById(R.id.message_input);
+
+        GlobalVars.initializeCodes();
+        ArrayAdapter<LanguageModel> dataAdapter = new ArrayAdapter<LanguageModel>(requireContext(),
+                android.R.layout.simple_spinner_item, GlobalVars.LANGUAGE_MODEL);
+        dataAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerLang.setAdapter(dataAdapter);
+
+        spinnerLang.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> adapterView, View view, int pos, long l) {
+                langs = pos;
+
+                spinnerLang.setVisibility(View.GONE);
+                getActivity().runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        mSocket.emit("switch_lang", GlobalVars.LANGUAGE_MODEL.get(langs).code);
+                    }
+                });
+
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> adapterView) {
+
+            }
+        });
+
         mInputMessageView.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override
             public boolean onEditorAction(TextView v, int id, KeyEvent event) {
@@ -282,6 +317,12 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_leave) {
             leave();
+            return true;
+        }
+
+        if (id == R.id.action_lang) {
+            spinnerLang.setVisibility(View.VISIBLE);
+            spinnerLang.performClick();
             return true;
         }
 

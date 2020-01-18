@@ -2,12 +2,9 @@ package com.github.nkzawa.socketio.androidchat;
 
 import android.content.Intent;
 import android.graphics.Color;
-import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
-import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -22,21 +19,14 @@ import android.widget.TextView;
 import com.github.nkzawa.socketio.androidchat.TTS.ConversationActivity;
 import com.github.nkzawa.socketio.androidchat.TTS.GlobalVars;
 import com.github.nkzawa.socketio.androidchat.TTS.LanguageModel;
-import com.github.nkzawa.socketio.androidchat.TTS.QueryUtils;
 import com.github.nkzawa.socketio.androidchat.TTS.TranslationActivity;
 import com.github.nkzawa.socketio.androidchat.bluetoothchat.BluetoothActivity;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.util.ArrayList;
-
 import io.socket.client.Socket;
 import io.socket.emitter.Emitter;
-
-import static com.github.nkzawa.socketio.androidchat.TTS.GlobalVars.BASE_REQ_URL;
-import static com.github.nkzawa.socketio.androidchat.TTS.GlobalVars.DEFAULT_LANG_POS;
-import static com.github.nkzawa.socketio.androidchat.TTS.GlobalVars.LANGUAGE_CODES;
 
 
 /**
