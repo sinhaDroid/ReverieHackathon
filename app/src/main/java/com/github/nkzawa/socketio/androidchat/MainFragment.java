@@ -26,9 +26,12 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -37,6 +40,7 @@ import com.ttlock.bl.sdk.api.TTLockClient;
 import com.ttlock.bl.sdk.callback.ControlLockCallback;
 import com.ttlock.bl.sdk.constant.ControlAction;
 import com.ttlock.bl.sdk.entity.LockError;
+import com.github.nkzawa.socketio.androidchat.TTS.LanguageModel;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -65,6 +69,7 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
 
     private static final int REQ_CODE_VOICE_IN = 143;
 
+    private Spinner spinnerLang;
     private RecyclerView mMessagesView;
     private EditText mInputMessageView;
     private List<Message> mMessages = new ArrayList<Message>();
@@ -114,6 +119,7 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
         mSocket.on("user left", onUserLeft);
         mSocket.on("typing", onTyping);
         mSocket.on("stop typing", onStopTyping);
+        mSocket.on("open_lock", onOpenLock);
         mSocket.connect();
 
         startSignIn();
@@ -136,6 +142,9 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
         if (mTextToSpeech != null) {
             mTextToSpeech.stop();
         }
+
+        handler.removeCallbacks(timeOut);
+
         super.onPause();
     }
 
@@ -161,6 +170,8 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
         mSocket.off("typing", onTyping);
         mSocket.off("stop typing", onStopTyping);
 
+        mSocket.off("open_lock", onOpenLock);
+
         if (mTextToSpeech != null) {
             mTextToSpeech.stop();
             mTextToSpeech.shutdown();
@@ -171,11 +182,41 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
     public void onViewCreated(View view, Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
+        spinnerLang = view.findViewById(R.id.lngSpinner);
+
         mMessagesView = view.findViewById(R.id.messages);
         mMessagesView.setLayoutManager(new LinearLayoutManager(getActivity()));
         mMessagesView.setAdapter(mAdapter);
 
         mInputMessageView = view.findViewById(R.id.message_input);
+
+        GlobalVars.initializeCodes();
+        ArrayAdapter<LanguageModel> dataAdapter = new ArrayAdapter<LanguageModel>(requireContext(),
+                android.R.layout.simple_spinner_item, GlobalVars.LANGUAGE_MODEL);
+        dataAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerLang.setAdapter(dataAdapter);
+
+        spinnerLang.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> adapterView, View view, int pos, long l) {
+                langs = pos;
+
+                spinnerLang.setVisibility(View.GONE);
+                getActivity().runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        mSocket.emit("switch_lang", GlobalVars.LANGUAGE_MODEL.get(langs).code);
+                    }
+                });
+
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> adapterView) {
+
+            }
+        });
+
         mInputMessageView.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override
             public boolean onEditorAction(TextView v, int id, KeyEvent event) {
@@ -243,7 +284,32 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
                 updateText(mInputMessageView, voiceText);
 //                mInputMessageView.setText(voiceText);
 
-                if (!mInputMessageView.getText().toString().equals("")) {
+                if (!voiceText.isEmpty()) {
+
+                    if (!TextUtils.isEmpty(passcode)) {
+
+                        handler.removeCallbacks(timeOut);
+
+                        if (voiceText.contains(passcode)) {
+                            //TODO: Open the Door
+                            unlockLock();
+                            speakOut(getDoorMsg(2));
+                            passcode = null;
+                        } else {
+
+                            if (tryAgain > 0) {
+                                speakOut(getDoorMsg(3));
+                                tryAgain = 0;
+                                handler.postDelayed(timeOut, 1000*60);
+                            } else {
+                                passcode = null;
+                                speakOut(getDoorMsg(4));
+                            }
+                        }
+
+                        return;
+                    }
+
                     attemptSend();
                 } else {
                     Toast.makeText(getActivity(), "Enter input...", Toast.LENGTH_SHORT).show();
@@ -282,6 +348,12 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_leave) {
             leave();
+            return true;
+        }
+
+        if (id == R.id.action_lang) {
+            spinnerLang.setVisibility(View.VISIBLE);
+            spinnerLang.performClick();
             return true;
         }
 
@@ -343,13 +415,11 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
         addMessage(mUsername, message);
 
         // perform the sending message attempt.
-        if(message.contains("8844"))
-            unlockLock();
         mSocket.emit("new message", message);
     }
 
     private void unlockLock() {
-        TTLockClient.getDefault().controlLock(ControlAction.UNLOCK, Constants.LOCK_URL, Constants.LOCK_MAC, new ControlLockCallback(){
+        TTLockClient.getDefault().controlLock(ControlAction.UNLOCK, Constants.LOCK_URL, Constants.LOCK_MAC, new ControlLockCallback() {
 
             @Override
             public void onControlLockSuccess(int lockAction, int battery, int uniqueId) {
@@ -448,7 +518,7 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
 
                     removeTyping(username);
                     addMessage(username, message);
-                    //TODO: Text to Speech here
+                    //Text to Speech here
                     if (mImageSpeak)
                         speakOut(message);
 
@@ -557,6 +627,24 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
         }
     };
 
+    private String passcode;
+    private int tryAgain = 0;
+
+    private Emitter.Listener onOpenLock = new Emitter.Listener() {
+        @Override
+        public void call(final Object... args) {
+            getActivity().runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    passcode = (String) args[0];
+                    tryAgain = 1;
+                    speakOut(getDoorMsg(1));
+                    handler.postDelayed(timeOut, 1000*60);
+                }
+            });
+        }
+    };
+
     //voice
     private void startVoiceToTextService() {
         Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
@@ -597,7 +685,6 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
             editText.requestFocus();
         }
     }
-
 
     @Override
     public void onInit(int status) {
@@ -647,5 +734,49 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
             mTextToSpeech.speak(msg, TextToSpeech.QUEUE_FLUSH, map);
         }
     }
+
+    private String getDoorMsg(int type) {
+
+        //For Hindi
+        if (langs == 1) {
+            switch (type) {
+                case 1:
+                    return "कृपया अपना पासवर्ड बताएं";
+                case 2:
+                    return "दरवाजा खुल रहा है";
+                case 3:
+                    return "कृपया सही पास कोड बताएं";
+                case 4:
+                    return "गलत पासकोड कृपया दोबारा कोशिश करें";
+                default:
+                    return "आप का समय समाप्त होता है";
+            }
+        }
+
+        switch (type) {
+            case 1:
+                return "Please tell your passcode.";
+            case 2:
+                return "Unlocking the door.";
+            case 3:
+                return "Please tell correct passcode!";
+            case 4:
+                return "Wrong passcode, please try again.";
+            default:
+                return "You time ends.";
+        }
+
+    }
+
+    final Handler handler = new Handler();
+    final Runnable timeOut = new Runnable() {
+        @Override
+        public void run() {
+            speakOut(getDoorMsg(5));
+            passcode = null;
+            tryAgain = 0;
+        }
+    };
+
 }
 
