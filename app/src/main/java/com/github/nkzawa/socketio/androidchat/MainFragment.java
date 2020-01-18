@@ -142,6 +142,9 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
         if (mTextToSpeech != null) {
             mTextToSpeech.stop();
         }
+
+        handler.removeCallbacks(timeOut);
+
         super.onPause();
     }
 
@@ -285,6 +288,8 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
 
                     if (!TextUtils.isEmpty(passcode)) {
 
+                        handler.removeCallbacks(timeOut);
+
                         if (voiceText.contains(passcode)) {
                             //TODO: Open the Door
                             unlockLock();
@@ -292,10 +297,11 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
                             passcode = null;
                         } else {
 
-                            if(tryAgain>0){
+                            if (tryAgain > 0) {
                                 speakOut(getDoorMsg(3));
                                 tryAgain = 0;
-                            }else{
+                                handler.postDelayed(timeOut, 1000*60);
+                            } else {
                                 passcode = null;
                                 speakOut(getDoorMsg(4));
                             }
@@ -633,6 +639,7 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
                     passcode = (String) args[0];
                     tryAgain = 1;
                     speakOut(getDoorMsg(1));
+                    handler.postDelayed(timeOut, 1000*60);
                 }
             });
         }
@@ -678,7 +685,6 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
             editText.requestFocus();
         }
     }
-
 
     @Override
     public void onInit(int status) {
@@ -740,8 +746,10 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
                     return "दरवाजा खुल रहा है";
                 case 3:
                     return "कृपया सही पास कोड बताएं";
-                default:
+                case 4:
                     return "गलत पासकोड कृपया दोबारा कोशिश करें";
+                default:
+                    return "आप का समय समाप्त होता है";
             }
         }
 
@@ -752,10 +760,23 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
                 return "Unlocking the door.";
             case 3:
                 return "Please tell correct passcode!";
-            default:
+            case 4:
                 return "Wrong passcode, please try again.";
+            default:
+                return "You time ends.";
         }
 
     }
+
+    final Handler handler = new Handler();
+    final Runnable timeOut = new Runnable() {
+        @Override
+        public void run() {
+            speakOut(getDoorMsg(5));
+            passcode = null;
+            tryAgain = 0;
+        }
+    };
+
 }
 
