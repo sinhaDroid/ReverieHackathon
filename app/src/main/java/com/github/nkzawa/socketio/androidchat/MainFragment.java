@@ -10,6 +10,7 @@ import android.os.Handler;
 import android.speech.RecognizerIntent;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
+import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -32,6 +33,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.github.nkzawa.socketio.androidchat.TTS.GlobalVars;
+import com.ttlock.bl.sdk.api.TTLockClient;
+import com.ttlock.bl.sdk.callback.ControlLockCallback;
+import com.ttlock.bl.sdk.constant.ControlAction;
+import com.ttlock.bl.sdk.entity.LockError;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -121,11 +126,23 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
     }
 
     @Override
+    public void onActivityCreated(@Nullable Bundle savedInstanceState) {
+        super.onActivityCreated(savedInstanceState);
+        TTLockClient.getDefault().prepareBTService(requireActivity().getApplicationContext());
+    }
+
+    @Override
     public void onPause() {
         if (mTextToSpeech != null) {
             mTextToSpeech.stop();
         }
         super.onPause();
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        TTLockClient.getDefault().stopBTService();
     }
 
     @Override
@@ -326,7 +343,24 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
         addMessage(mUsername, message);
 
         // perform the sending message attempt.
+        if(message.contains("8844"))
+            unlockLock();
         mSocket.emit("new message", message);
+    }
+
+    private void unlockLock() {
+        TTLockClient.getDefault().controlLock(ControlAction.UNLOCK, Constants.LOCK_URL, Constants.LOCK_MAC, new ControlLockCallback(){
+
+            @Override
+            public void onControlLockSuccess(int lockAction, int battery, int uniqueId) {
+                updateText(mInputMessageView, "successfully opened");
+            }
+
+            @Override
+            public void onFail(LockError error) {
+
+            }
+        });
     }
 
     private void startSignIn() {
