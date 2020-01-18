@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.speech.RecognizerIntent;
 import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 import android.support.v4.app.Fragment;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -35,6 +36,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 
@@ -47,7 +49,7 @@ import static android.app.Activity.RESULT_OK;
 /**
  * A chat fragment containing messages view and input form.
  */
-public class MainFragment extends Fragment {
+public class MainFragment extends Fragment implements TextToSpeech.OnInitListener {
 
     private static final String TAG = "MainFragment";
 
@@ -71,8 +73,10 @@ public class MainFragment extends Fragment {
 
     private Boolean isConnected = true;
     private boolean isUsedOnce = false;
+    private boolean mImageSpeak = false;
 
-    private TextToSpeech textToSpeech;
+    private TextToSpeech mTextToSpeech;
+    HashMap<String, String> map = new HashMap<>();
 
     public MainFragment() {
         super();
@@ -120,6 +124,14 @@ public class MainFragment extends Fragment {
     }
 
     @Override
+    public void onPause() {
+        if (mTextToSpeech != null) {
+            mTextToSpeech.stop();
+        }
+        super.onPause();
+    }
+
+    @Override
     public void onDestroy() {
         super.onDestroy();
 
@@ -134,6 +146,11 @@ public class MainFragment extends Fragment {
         mSocket.off("user left", onUserLeft);
         mSocket.off("typing", onTyping);
         mSocket.off("stop typing", onStopTyping);
+
+        if (mTextToSpeech != null) {
+            mTextToSpeech.stop();
+            mTextToSpeech.shutdown();
+        }
     }
 
     @Override
@@ -258,15 +275,7 @@ public class MainFragment extends Fragment {
     }
 
     private void initializedTTS() {
-        textToSpeech = new TextToSpeech(requireContext(),
-                new TextToSpeech.OnInitListener() {
-                    @Override
-                    public void onInit(int status) {
-                        if (status != TextToSpeech.ERROR) {
-                            textToSpeech.setLanguage(Locale.forLanguageTag(langs));
-                        }
-                    }
-                });
+        mTextToSpeech = new TextToSpeech(requireContext(), this);
     }
 
     private void addLog(String message) {
@@ -409,6 +418,9 @@ public class MainFragment extends Fragment {
                     removeTyping(username);
                     addMessage(username, message, lang);
                     //TODO: Text to Speech here
+                    if (mImageSpeak)
+                        speakOut(message);
+
 
                 }
             });
@@ -519,7 +531,7 @@ public class MainFragment extends Fragment {
         Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
         //You can set here own local Language.
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.US);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, langs);
         intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "I am listening...");
         try {
             startActivityForResult(intent, REQ_CODE_VOICE_IN);
@@ -554,5 +566,53 @@ public class MainFragment extends Fragment {
     }
 
 
+    @Override
+    public void onInit(int status) {
+        if (status == TextToSpeech.SUCCESS) {
+            int result = mTextToSpeech.setLanguage(new Locale("en"));
+            if (result == TextToSpeech.LANG_MISSING_DATA) {
+                Toast.makeText(requireContext(), getString(R.string.language_pack_missing), Toast.LENGTH_SHORT).show();
+            } else if (result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                Toast.makeText(requireContext(), getString(R.string.language_not_supported), Toast.LENGTH_SHORT).show();
+            }
+
+            mImageSpeak = true;
+
+            mTextToSpeech.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                @Override
+                public void onStart(String utteranceId) {
+                    Log.e("Inside", "OnStart");
+                }
+
+                @Override
+                public void onDone(String utteranceId) {
+                }
+
+                @Override
+                public void onError(String utteranceId) {
+                }
+            });
+        } else {
+            Log.e("", "TTS Initilization Failed");
+        }
+    }
+
+    //  TEXT TO SPEECH ACTION
+    @SuppressWarnings("deprecation")
+    private void speakOut(String msg) {
+        int result = mTextToSpeech.setLanguage(new Locale(langs));
+        Log.e("Inside", "speakOut " + langs + " " + result);
+        if (result == TextToSpeech.LANG_MISSING_DATA) {
+            Toast.makeText(requireContext(), getString(R.string.language_pack_missing), Toast.LENGTH_SHORT).show();
+            Intent installIntent = new Intent();
+            installIntent.setAction(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA);
+            startActivity(installIntent);
+        } else if (result == TextToSpeech.LANG_NOT_SUPPORTED) {
+            Toast.makeText(requireContext(), getString(R.string.language_not_supported), Toast.LENGTH_SHORT).show();
+        } else {
+            map.put(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "UniqueID");
+            mTextToSpeech.speak(msg, TextToSpeech.QUEUE_FLUSH, map);
+        }
+    }
 }
 

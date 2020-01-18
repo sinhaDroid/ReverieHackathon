@@ -3,8 +3,11 @@ package com.github.nkzawa.socketio.androidchat;
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Color;
+import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -16,17 +19,21 @@ import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.TextView;
 
-import io.socket.client.Socket;
-import io.socket.emitter.Emitter;
-
 import com.github.nkzawa.socketio.androidchat.TTS.ConversationActivity;
+import com.github.nkzawa.socketio.androidchat.TTS.QueryUtils;
 import com.github.nkzawa.socketio.androidchat.TTS.TranslationActivity;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
-import java.util.List;
+
+import io.socket.client.Socket;
+import io.socket.emitter.Emitter;
+
+import static com.github.nkzawa.socketio.androidchat.TTS.GlobalVars.BASE_REQ_URL;
+import static com.github.nkzawa.socketio.androidchat.TTS.GlobalVars.DEFAULT_LANG_POS;
+import static com.github.nkzawa.socketio.androidchat.TTS.GlobalVars.LANGUAGE_CODES;
 
 
 /**
@@ -39,14 +46,15 @@ public class LoginActivity extends Activity {
     private String mUsername;
     private Socket mSocket;
 
-    private int langSelectPos = 0;
-    private final String[] langs = {"en", "hi"};
+    private String langSelectPos = "";
+    volatile boolean activityRunning;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
 
+        activityRunning = true;
         ChatApplication app = (ChatApplication) getApplication();
         mSocket = app.getSocket();
 
@@ -64,20 +72,10 @@ public class LoginActivity extends Activity {
         });
 
         spinner = findViewById(R.id.lngSpinner);
-        List<String> list = new ArrayList<>();
-        list.add("Select your language");
-        list.add("English");
-        list.add("Hindi");
-
-        ArrayAdapter<String> dataAdapter = new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_item, list);
-        dataAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinner.setAdapter(dataAdapter);
-
         spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> adapterView, View view, int pos, long l) {
-                langSelectPos = pos;
+                langSelectPos = LANGUAGE_CODES.get(pos);
             }
 
             @Override
@@ -113,12 +111,15 @@ public class LoginActivity extends Activity {
                 startActivity(intent);
             }
         });
+
+        //  GET LANGUAGES LIST
+        new GetLanguages().execute();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-
+        activityRunning = false;
         mSocket.off("login", onLogin);
     }
 
@@ -143,7 +144,7 @@ public class LoginActivity extends Activity {
             return;
         }
 
-        if (langSelectPos == 0) {
+        if (langSelectPos.isEmpty()) {
             setSpinnerError();
             return;
         }
@@ -153,7 +154,7 @@ public class LoginActivity extends Activity {
         JSONObject body = new JSONObject();
         try {
             body.put("username", username);
-            body.put("lang", langs[langSelectPos - 1]);
+            body.put("lang", langSelectPos);
             // perform the user login attempt.
             mSocket.emit("add user", body);
         } catch (JSONException e) {
@@ -175,7 +176,7 @@ public class LoginActivity extends Activity {
 
             Intent intent = new Intent();
             intent.putExtra("username", mUsername);
-            intent.putExtra("lang", langs[langSelectPos - 1]);
+            intent.putExtra("lang", langSelectPos);
             intent.putExtra("numUsers", numUsers);
             setResult(RESULT_OK, intent);
             finish();
@@ -192,6 +193,31 @@ public class LoginActivity extends Activity {
             selectedTextView.setText("Please select your language"); // actual error message
             spinner.performClick(); // to open the spinner list if error is found.
 
+        }
+    }
+
+    //  SUBCLASS TO GET LIST OF LANGUAGES ON BACKGROUND THREAD
+    private class GetLanguages extends AsyncTask<Void, Void, ArrayList<String>> {
+        @Override
+        protected ArrayList<String> doInBackground(Void... params) {
+            Uri baseUri = Uri.parse(BASE_REQ_URL);
+            Uri.Builder uriBuilder = baseUri.buildUpon();
+            uriBuilder.appendPath("getLangs")
+                    .appendQueryParameter("key", getString(R.string.API_KEY))
+                    .appendQueryParameter("ui", "en");
+            Log.e("String Url ---->", uriBuilder.toString());
+            return QueryUtils.fetchLanguages(uriBuilder.toString());
+        }
+
+        @Override
+        protected void onPostExecute(ArrayList<String> result) {
+            if (activityRunning) {
+                ArrayAdapter<String> adapter = new ArrayAdapter<>(LoginActivity.this, android.R.layout.simple_spinner_item, result);
+                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                spinner.setAdapter(adapter);
+                //  SET DEFAULT LANGUAGE SELECTIONS
+                spinner.setSelection(DEFAULT_LANG_POS);
+            }
         }
     }
 }

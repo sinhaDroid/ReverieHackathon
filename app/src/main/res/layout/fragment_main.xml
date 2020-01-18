@@ -52,9 +52,4 @@
         android:background="@android:drawable/presence_audio_busy"
         android:layout_gravity="center"
         android:layout_marginBottom="10dp"/>
-
-    <ProgressBar
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"/>
-
 </LinearLayout>
