@@ -62,7 +62,10 @@ public class MainFragment extends Fragment {
     private RecyclerView.Adapter mAdapter;
     private boolean mTyping = false;
     private Handler mTypingHandler = new Handler();
+
     private String mUsername;
+    private String langs = "en";
+
     private Socket mSocket;
 
     private Boolean isConnected = true;
@@ -71,7 +74,6 @@ public class MainFragment extends Fragment {
     public MainFragment() {
         super();
     }
-
 
     // This event fires 1st, before creation of fragment or any views
     // The onAttach method is called when the Fragment instance is associated with an Activity.
@@ -220,6 +222,7 @@ public class MainFragment extends Fragment {
             }
 
             mUsername = data.getStringExtra("username");
+            langs = data.getStringExtra("lang");
             int numUsers = data.getIntExtra("numUsers", 1);
 
             addLog(getResources().getString(R.string.message_welcome));
