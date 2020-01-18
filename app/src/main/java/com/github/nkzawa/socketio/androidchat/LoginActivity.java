@@ -24,6 +24,7 @@ import com.github.nkzawa.socketio.androidchat.TTS.GlobalVars;
 import com.github.nkzawa.socketio.androidchat.TTS.LanguageModel;
 import com.github.nkzawa.socketio.androidchat.TTS.QueryUtils;
 import com.github.nkzawa.socketio.androidchat.TTS.TranslationActivity;
+import com.github.nkzawa.socketio.androidchat.bluetoothchat.BluetoothActivity;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -116,6 +117,14 @@ public class LoginActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 Intent intent = new Intent(LoginActivity.this, TranslationActivity.class);
+                startActivity(intent);
+            }
+        });
+
+        findViewById(R.id.start_ble_chat).setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Intent intent = new Intent(LoginActivity.this, BluetoothActivity.class);
                 startActivity(intent);
             }
         });
