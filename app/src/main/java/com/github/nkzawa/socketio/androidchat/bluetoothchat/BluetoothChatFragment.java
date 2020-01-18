@@ -24,6 +24,8 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
@@ -44,12 +46,16 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.github.nkzawa.socketio.androidchat.R;
+import com.github.nkzawa.socketio.androidchat.TTS.GlobalVars;
 import com.github.nkzawa.socketio.androidchat.common.logger.Log;
+
+import java.util.HashMap;
+import java.util.Locale;
 
 /**
  * This fragment controls Bluetooth to communicate with other devices.
  */
-public class BluetoothChatFragment extends Fragment {
+public class BluetoothChatFragment extends Fragment implements TextToSpeech.OnInitListener{
 
     private static final String TAG = "BluetoothChatFragment";
 
@@ -62,6 +68,10 @@ public class BluetoothChatFragment extends Fragment {
     private ListView mConversationView;
     private EditText mOutEditText;
     private Button mSendButton;
+
+    private boolean mImageSpeak = false;
+    private TextToSpeech mTextToSpeech;
+    HashMap<String, String> map = new HashMap<>();
 
     /**
      * Name of the connected device
@@ -121,10 +131,23 @@ public class BluetoothChatFragment extends Fragment {
     }
 
     @Override
+    public void onPause() {
+        if (mTextToSpeech != null) {
+            mTextToSpeech.stop();
+        }
+        super.onPause();
+    }
+
+    @Override
     public void onDestroy() {
         super.onDestroy();
         if (mChatService != null) {
             mChatService.stop();
+        }
+
+        if (mTextToSpeech != null) {
+            mTextToSpeech.stop();
+            mTextToSpeech.shutdown();
         }
     }
 
@@ -155,6 +178,8 @@ public class BluetoothChatFragment extends Fragment {
         mConversationView = view.findViewById(R.id.in);
         mOutEditText = view.findViewById(R.id.edit_text_out);
         mSendButton = view.findViewById(R.id.button_send);
+
+        mTextToSpeech = new TextToSpeech(requireContext(), this);
     }
 
     /**
@@ -314,6 +339,10 @@ public class BluetoothChatFragment extends Fragment {
                     // construct a string from the valid bytes in the buffer
                     String readMessage = new String(readBuf, 0, msg.arg1);
                     mConversationArrayAdapter.add(mConnectedDeviceName + ":  " + readMessage);
+
+                    if (mImageSpeak)
+                        speakOut(readMessage);
+
                     break;
                 case Constants.MESSAGE_DEVICE_NAME:
                     // save the connected device's name
@@ -413,4 +442,51 @@ public class BluetoothChatFragment extends Fragment {
         return false;
     }
 
+    @Override
+    public void onInit(int status) {
+        if (status == TextToSpeech.SUCCESS) {
+            int result = mTextToSpeech.setLanguage(new Locale("en"));
+            if (result == TextToSpeech.LANG_MISSING_DATA) {
+                Toast.makeText(requireContext(), getString(R.string.language_pack_missing), Toast.LENGTH_SHORT).show();
+            } else if (result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                Toast.makeText(requireContext(), getString(R.string.language_not_supported), Toast.LENGTH_SHORT).show();
+            }
+
+            mImageSpeak = true;
+
+            mTextToSpeech.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                @Override
+                public void onStart(String utteranceId) {
+                    android.util.Log.e("Inside", "OnStart");
+                }
+
+                @Override
+                public void onDone(String utteranceId) {
+                }
+
+                @Override
+                public void onError(String utteranceId) {
+                }
+            });
+        } else {
+            android.util.Log.e("", "TTS Initilization Failed");
+        }
+    }
+
+    //  TEXT TO SPEECH ACTION
+    @SuppressWarnings("deprecation")
+    private void speakOut(String msg) {
+        int result = mTextToSpeech.setLanguage(new Locale(GlobalVars.LANGUAGE_MODEL.get(1).localCode));
+        if (result == TextToSpeech.LANG_MISSING_DATA) {
+            Toast.makeText(requireContext(), getString(R.string.language_pack_missing), Toast.LENGTH_SHORT).show();
+            Intent installIntent = new Intent();
+            installIntent.setAction(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA);
+            startActivity(installIntent);
+        } else if (result == TextToSpeech.LANG_NOT_SUPPORTED) {
+            Toast.makeText(requireContext(), getString(R.string.language_not_supported), Toast.LENGTH_SHORT).show();
+        } else {
+            map.put(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "UniqueID");
+            mTextToSpeech.speak(msg, TextToSpeech.QUEUE_FLUSH, map);
+        }
+    }
 }

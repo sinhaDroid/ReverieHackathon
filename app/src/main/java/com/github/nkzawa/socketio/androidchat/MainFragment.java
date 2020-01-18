@@ -448,7 +448,7 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
 
                     removeTyping(username);
                     addMessage(username, message);
-                    //TODO: Text to Speech here
+                    //Text to Speech here
                     if (mImageSpeak)
                         speakOut(message);
 
