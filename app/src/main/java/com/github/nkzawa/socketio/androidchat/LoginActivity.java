@@ -20,6 +20,8 @@ import android.widget.Spinner;
 import android.widget.TextView;
 
 import com.github.nkzawa.socketio.androidchat.TTS.ConversationActivity;
+import com.github.nkzawa.socketio.androidchat.TTS.GlobalVars;
+import com.github.nkzawa.socketio.androidchat.TTS.LanguageModel;
 import com.github.nkzawa.socketio.androidchat.TTS.QueryUtils;
 import com.github.nkzawa.socketio.androidchat.TTS.TranslationActivity;
 
@@ -46,7 +48,7 @@ public class LoginActivity extends AppCompatActivity {
     private String mUsername;
     private Socket mSocket;
 
-    private String langSelectPos = "";
+    private int langSelectPos = 0;
     volatile boolean activityRunning;
 
     @Override
@@ -72,10 +74,16 @@ public class LoginActivity extends AppCompatActivity {
         });
 
         spinner = findViewById(R.id.lngSpinner);
+        GlobalVars.initializeCodes();
+        ArrayAdapter<LanguageModel> dataAdapter = new ArrayAdapter<LanguageModel>(this,
+                android.R.layout.simple_spinner_item, GlobalVars.LANGUAGE_MODEL);
+        dataAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinner.setAdapter(dataAdapter);
+
         spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> adapterView, View view, int pos, long l) {
-                langSelectPos = LANGUAGE_CODES.get(pos);
+                langSelectPos = pos;
             }
 
             @Override
@@ -113,7 +121,7 @@ public class LoginActivity extends AppCompatActivity {
         });
 
         //  GET LANGUAGES LIST
-        new GetLanguages().execute();
+        //new GetLanguages().execute();
     }
 
     @Override
@@ -144,17 +152,12 @@ public class LoginActivity extends AppCompatActivity {
             return;
         }
 
-        if (langSelectPos.isEmpty()) {
-            setSpinnerError();
-            return;
-        }
-
         mUsername = username;
 
         JSONObject body = new JSONObject();
         try {
             body.put("username", username);
-            body.put("lang", langSelectPos);
+            body.put("lang", GlobalVars.LANGUAGE_MODEL.get(langSelectPos).code);
             // perform the user login attempt.
             mSocket.emit("add user", body);
         } catch (JSONException e) {
@@ -196,30 +199,30 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
-    //  SUBCLASS TO GET LIST OF LANGUAGES ON BACKGROUND THREAD
-    private class GetLanguages extends AsyncTask<Void, Void, ArrayList<String>> {
-        @Override
-        protected ArrayList<String> doInBackground(Void... params) {
-            Uri baseUri = Uri.parse(BASE_REQ_URL);
-            Uri.Builder uriBuilder = baseUri.buildUpon();
-            uriBuilder.appendPath("getLangs")
-                    .appendQueryParameter("key", getString(R.string.API_KEY))
-                    .appendQueryParameter("ui", "en");
-            Log.e("String Url ---->", uriBuilder.toString());
-            return QueryUtils.fetchLanguages(uriBuilder.toString());
-        }
-
-        @Override
-        protected void onPostExecute(ArrayList<String> result) {
-            if (activityRunning) {
-                ArrayAdapter<String> adapter = new ArrayAdapter<>(LoginActivity.this, android.R.layout.simple_spinner_item, result);
-                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                spinner.setAdapter(adapter);
-                //  SET DEFAULT LANGUAGE SELECTIONS
-                spinner.setSelection(DEFAULT_LANG_POS);
-            }
-        }
-    }
+//    //  SUBCLASS TO GET LIST OF LANGUAGES ON BACKGROUND THREAD
+//    private class GetLanguages extends AsyncTask<Void, Void, ArrayList<String>> {
+//        @Override
+//        protected ArrayList<String> doInBackground(Void... params) {
+//            Uri baseUri = Uri.parse(BASE_REQ_URL);
+//            Uri.Builder uriBuilder = baseUri.buildUpon();
+//            uriBuilder.appendPath("getLangs")
+//                    .appendQueryParameter("key", getString(R.string.API_KEY))
+//                    .appendQueryParameter("ui", "en");
+//            Log.e("String Url ---->", uriBuilder.toString());
+//            return QueryUtils.fetchLanguages(uriBuilder.toString());
+//        }
+//
+//        @Override
+//        protected void onPostExecute(ArrayList<String> result) {
+//            if (activityRunning) {
+//                ArrayAdapter<String> adapter = new ArrayAdapter<>(LoginActivity.this, android.R.layout.simple_spinner_item, result);
+//                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+//                spinner.setAdapter(adapter);
+//                //  SET DEFAULT LANGUAGE SELECTIONS
+//                spinner.setSelection(DEFAULT_LANG_POS);
+//            }
+//        }
+//    }
 }
 
 

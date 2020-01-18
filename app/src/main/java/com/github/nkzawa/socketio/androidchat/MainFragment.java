@@ -31,6 +31,8 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.github.nkzawa.socketio.androidchat.TTS.GlobalVars;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -66,7 +68,7 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
     private Handler mTypingHandler = new Handler();
 
     private String mUsername;
-    private String langs = "en";
+    private int langs = 0;
 
     private Socket mSocket;
 
@@ -89,7 +91,6 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
         super.onAttach(context);
         mAdapter = new MessageAdapter(context, mMessages);
     }
-
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -238,7 +239,7 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
             }
 
             mUsername = data.getStringExtra("username");
-            langs = data.getStringExtra("lang");
+            langs = data.getIntExtra("lang", 0);
             int numUsers = data.getIntExtra("numUsers", 1);
 
             addLog(getResources().getString(R.string.message_welcome));
@@ -285,7 +286,7 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
         addLog(getResources().getQuantityString(R.plurals.message_participants, numUsers, numUsers));
     }
 
-    private void addMessage(String username, String message, String lang) {
+    private void addMessage(String username, String message) {
         mMessages.add(new Message.Builder(Message.TYPE_MESSAGE)
                 .username(username).message(message).build());
         mAdapter.notifyItemInserted(mMessages.size() - 1);
@@ -322,7 +323,7 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
         }
 
         mInputMessageView.setText("");
-        addMessage(mUsername, message, langs);
+        addMessage(mUsername, message);
 
         // perform the sending message attempt.
         mSocket.emit("new message", message);
@@ -412,7 +413,7 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
                     }
 
                     removeTyping(username);
-                    addMessage(username, message, lang);
+                    addMessage(username, message);
                     //TODO: Text to Speech here
                     if (mImageSpeak)
                         speakOut(message);
@@ -526,9 +527,11 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
     private void startVoiceToTextService() {
         Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
         //You can set here own local Language.
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, langs);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);//RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, GlobalVars.LANGUAGE_MODEL.get(langs).localCode);
         intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "I am listening...");
+        intent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, requireContext().getPackageName());
+
         try {
             startActivityForResult(intent, REQ_CODE_VOICE_IN);
         } catch (ActivityNotFoundException a) {
@@ -596,7 +599,7 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
     //  TEXT TO SPEECH ACTION
     @SuppressWarnings("deprecation")
     private void speakOut(String msg) {
-        int result = mTextToSpeech.setLanguage(new Locale(langs));
+        int result = mTextToSpeech.setLanguage(new Locale(GlobalVars.LANGUAGE_MODEL.get(langs).localCode));
         Log.e("Inside", "speakOut " + langs + " " + result);
         if (result == TextToSpeech.LANG_MISSING_DATA) {
             Toast.makeText(requireContext(), getString(R.string.language_pack_missing), Toast.LENGTH_SHORT).show();
