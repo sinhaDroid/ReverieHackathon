@@ -9,6 +9,7 @@ import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.os.Handler;
 import android.speech.RecognizerIntent;
+import android.speech.tts.TextToSpeech;
 import android.support.v4.app.Fragment;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -69,7 +70,9 @@ public class MainFragment extends Fragment {
     private Socket mSocket;
 
     private Boolean isConnected = true;
-    private boolean isUsedOnce=false;
+    private boolean isUsedOnce = false;
+
+    private TextToSpeech textToSpeech;
 
     public MainFragment() {
         super();
@@ -82,7 +85,7 @@ public class MainFragment extends Fragment {
     public void onAttach(Context context) {
         super.onAttach(context);
         mAdapter = new MessageAdapter(context, mMessages);
-        if (context instanceof Activity){
+        if (context instanceof Activity) {
             //this.listener = (MainActivity) context;
         }
     }
@@ -96,8 +99,8 @@ public class MainFragment extends Fragment {
 
         ChatApplication app = (ChatApplication) getActivity().getApplication();
         mSocket = app.getSocket();
-        mSocket.on(Socket.EVENT_CONNECT,onConnect);
-        mSocket.on(Socket.EVENT_DISCONNECT,onDisconnect);
+        mSocket.on(Socket.EVENT_CONNECT, onConnect);
+        mSocket.on(Socket.EVENT_DISCONNECT, onDisconnect);
         mSocket.on(Socket.EVENT_CONNECT_ERROR, onConnectError);
         mSocket.on(Socket.EVENT_CONNECT_TIMEOUT, onConnectError);
         mSocket.on("new message", onNewMessage);
@@ -137,11 +140,11 @@ public class MainFragment extends Fragment {
     public void onViewCreated(View view, Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        mMessagesView = (RecyclerView) view.findViewById(R.id.messages);
+        mMessagesView = view.findViewById(R.id.messages);
         mMessagesView.setLayoutManager(new LinearLayoutManager(getActivity()));
         mMessagesView.setAdapter(mAdapter);
 
-        mInputMessageView = (EditText) view.findViewById(R.id.message_input);
+        mInputMessageView = view.findViewById(R.id.message_input);
         mInputMessageView.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override
             public boolean onEditorAction(TextView v, int id, KeyEvent event) {
@@ -176,7 +179,7 @@ public class MainFragment extends Fragment {
             }
         });
 
-        ImageButton sendButton = (ImageButton) view.findViewById(R.id.send_button);
+        ImageButton sendButton = view.findViewById(R.id.send_button);
         sendButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -184,11 +187,11 @@ public class MainFragment extends Fragment {
             }
         });
 
-        ImageView img_convert=(ImageView) view.findViewById(R.id.id_convert);
+        ImageView img_convert = view.findViewById(R.id.id_convert);
         img_convert.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if(isOnline()){
+                if (isOnline()) {
                     /*if (!isUsedOnce){
                         txt_greeting.setVisibility(View.GONE);
                         linearLayout.setVisibility(View.VISIBLE);
@@ -227,6 +230,8 @@ public class MainFragment extends Fragment {
 
             addLog(getResources().getString(R.string.message_welcome));
             addParticipantsLog(numUsers);
+
+            initializedTTS();
         }
     }
 
@@ -252,6 +257,18 @@ public class MainFragment extends Fragment {
         return super.onOptionsItemSelected(item);
     }
 
+    private void initializedTTS() {
+        textToSpeech = new TextToSpeech(requireContext(),
+                new TextToSpeech.OnInitListener() {
+                    @Override
+                    public void onInit(int status) {
+                        if (status != TextToSpeech.ERROR) {
+                            textToSpeech.setLanguage(Locale.forLanguageTag(langs));
+                        }
+                    }
+                });
+    }
+
     private void addLog(String message) {
         mMessages.add(new Message.Builder(Message.TYPE_LOG)
                 .message(message).build());
@@ -263,7 +280,7 @@ public class MainFragment extends Fragment {
         addLog(getResources().getQuantityString(R.plurals.message_participants, numUsers, numUsers));
     }
 
-    private void addMessage(String username, String message) {
+    private void addMessage(String username, String message, String lang) {
         mMessages.add(new Message.Builder(Message.TYPE_MESSAGE)
                 .username(username).message(message).build());
         mAdapter.notifyItemInserted(mMessages.size() - 1);
@@ -300,7 +317,7 @@ public class MainFragment extends Fragment {
         }
 
         mInputMessageView.setText("");
-        addMessage(mUsername, message);
+        addMessage(mUsername, message, langs);
 
         // perform the sending message attempt.
         mSocket.emit("new message", message);
@@ -329,8 +346,8 @@ public class MainFragment extends Fragment {
             getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    if(!isConnected) {
-                        if(null!=mUsername)
+                    if (!isConnected) {
+                        if (null != mUsername)
                             mSocket.emit("add user", mUsername);
                         Toast.makeText(getActivity().getApplicationContext(),
                                 R.string.connect, Toast.LENGTH_LONG).show();
@@ -379,16 +396,20 @@ public class MainFragment extends Fragment {
                     JSONObject data = (JSONObject) args[0];
                     String username;
                     String message;
+                    String lang;
                     try {
                         username = data.getString("username");
                         message = data.getString("message");
+                        lang = data.getString("lang");
                     } catch (JSONException e) {
                         Log.e(TAG, e.getMessage());
                         return;
                     }
 
                     removeTyping(username);
-                    addMessage(username, message);
+                    addMessage(username, message, lang);
+                    //TODO: Text to Speech here
+
                 }
             });
         }
@@ -502,9 +523,8 @@ public class MainFragment extends Fragment {
         intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "I am listening...");
         try {
             startActivityForResult(intent, REQ_CODE_VOICE_IN);
-        }
-        catch (ActivityNotFoundException a) {
-            Toast.makeText(requireActivity(),a.toString(),Toast.LENGTH_SHORT).show();
+        } catch (ActivityNotFoundException a) {
+            Toast.makeText(requireActivity(), a.toString(), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -514,10 +534,10 @@ public class MainFragment extends Fragment {
         if (connMgr != null) {
             networkInfo = connMgr.getActiveNetworkInfo();
         }
-        if(networkInfo != null && networkInfo.isConnected())
+        if (networkInfo != null && networkInfo.isConnected())
             return true;
         else {
-            Toast.makeText(requireActivity(),"Check network connection.",Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireActivity(), "Check network connection.", Toast.LENGTH_SHORT).show();
             return false;
         }
     }
@@ -532,5 +552,7 @@ public class MainFragment extends Fragment {
             editText.requestFocus();
         }
     }
+
+
 }
 

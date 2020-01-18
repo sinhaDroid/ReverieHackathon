@@ -134,7 +134,7 @@ public class LoginActivity extends Activity {
             body.put("username", username);
             body.put("lang", langs[langSelectPos - 1]);
             // perform the user login attempt.
-            mSocket.emit("add user", username);
+            mSocket.emit("add user", body);
         } catch (JSONException e) {
             e.printStackTrace();
         }
