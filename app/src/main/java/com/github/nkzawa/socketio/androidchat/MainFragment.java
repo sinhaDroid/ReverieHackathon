@@ -81,7 +81,7 @@ public class MainFragment extends Fragment {
         super.onAttach(context);
         mAdapter = new MessageAdapter(context, mMessages);
         if (context instanceof Activity){
-            //this.listener = (MainActivity) context;
+            //this.listener = (BluetoothActivity) context;
         }
     }
 
