@@ -9,6 +9,8 @@ import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.os.Handler;
 import android.speech.RecognizerIntent;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 import android.support.v4.app.Fragment;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -34,6 +36,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 
@@ -46,7 +49,7 @@ import static android.support.v7.app.AppCompatActivity.RESULT_OK;
 /**
  * A chat fragment containing messages view and input form.
  */
-public class MainFragment extends Fragment {
+public class MainFragment extends Fragment implements TextToSpeech.OnInitListener {
 
     private static final String TAG = "MainFragment";
 
@@ -62,16 +65,22 @@ public class MainFragment extends Fragment {
     private RecyclerView.Adapter mAdapter;
     private boolean mTyping = false;
     private Handler mTypingHandler = new Handler();
+
     private String mUsername;
+    private String langs = "en";
+
     private Socket mSocket;
 
     private Boolean isConnected = true;
-    private boolean isUsedOnce=false;
+    private boolean isUsedOnce = false;
+    private boolean mImageSpeak = false;
+
+    private TextToSpeech mTextToSpeech;
+    HashMap<String, String> map = new HashMap<>();
 
     public MainFragment() {
         super();
     }
-
 
     // This event fires 1st, before creation of fragment or any views
     // The onAttach method is called when the Fragment instance is associated with an Activity.
@@ -80,8 +89,6 @@ public class MainFragment extends Fragment {
     public void onAttach(Context context) {
         super.onAttach(context);
         mAdapter = new MessageAdapter(context, mMessages);
-        if (context instanceof Activity){
-            //this.listener = (BluetoothActivity) context;
         }
     }
 
@@ -94,8 +101,8 @@ public class MainFragment extends Fragment {
 
         ChatApplication app = (ChatApplication) getActivity().getApplication();
         mSocket = app.getSocket();
-        mSocket.on(Socket.EVENT_CONNECT,onConnect);
-        mSocket.on(Socket.EVENT_DISCONNECT,onDisconnect);
+        mSocket.on(Socket.EVENT_CONNECT, onConnect);
+        mSocket.on(Socket.EVENT_DISCONNECT, onDisconnect);
         mSocket.on(Socket.EVENT_CONNECT_ERROR, onConnectError);
         mSocket.on(Socket.EVENT_CONNECT_TIMEOUT, onConnectError);
         mSocket.on("new message", onNewMessage);
@@ -115,6 +122,14 @@ public class MainFragment extends Fragment {
     }
 
     @Override
+    public void onPause() {
+        if (mTextToSpeech != null) {
+            mTextToSpeech.stop();
+        }
+        super.onPause();
+    }
+
+    @Override
     public void onDestroy() {
         super.onDestroy();
 
@@ -129,17 +144,22 @@ public class MainFragment extends Fragment {
         mSocket.off("user left", onUserLeft);
         mSocket.off("typing", onTyping);
         mSocket.off("stop typing", onStopTyping);
+
+        if (mTextToSpeech != null) {
+            mTextToSpeech.stop();
+            mTextToSpeech.shutdown();
+        }
     }
 
     @Override
     public void onViewCreated(View view, Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        mMessagesView = (RecyclerView) view.findViewById(R.id.messages);
+        mMessagesView = view.findViewById(R.id.messages);
         mMessagesView.setLayoutManager(new LinearLayoutManager(getActivity()));
         mMessagesView.setAdapter(mAdapter);
 
-        mInputMessageView = (EditText) view.findViewById(R.id.message_input);
+        mInputMessageView = view.findViewById(R.id.message_input);
         mInputMessageView.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override
             public boolean onEditorAction(TextView v, int id, KeyEvent event) {
@@ -174,7 +194,7 @@ public class MainFragment extends Fragment {
             }
         });
 
-        ImageButton sendButton = (ImageButton) view.findViewById(R.id.send_button);
+        ImageButton sendButton = view.findViewById(R.id.send_button);
         sendButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -182,11 +202,11 @@ public class MainFragment extends Fragment {
             }
         });
 
-        ImageView img_convert=(ImageView) view.findViewById(R.id.id_convert);
+        ImageView img_convert = view.findViewById(R.id.id_convert);
         img_convert.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if(isOnline()){
+                if (isOnline()) {
                     /*if (!isUsedOnce){
                         txt_greeting.setVisibility(View.GONE);
                         linearLayout.setVisibility(View.VISIBLE);
@@ -220,10 +240,13 @@ public class MainFragment extends Fragment {
             }
 
             mUsername = data.getStringExtra("username");
+            langs = data.getStringExtra("lang");
             int numUsers = data.getIntExtra("numUsers", 1);
 
             addLog(getResources().getString(R.string.message_welcome));
             addParticipantsLog(numUsers);
+
+            initializedTTS();
         }
     }
 
@@ -249,6 +272,10 @@ public class MainFragment extends Fragment {
         return super.onOptionsItemSelected(item);
     }
 
+    private void initializedTTS() {
+        mTextToSpeech = new TextToSpeech(requireContext(), this);
+    }
+
     private void addLog(String message) {
         mMessages.add(new Message.Builder(Message.TYPE_LOG)
                 .message(message).build());
@@ -260,7 +287,7 @@ public class MainFragment extends Fragment {
         addLog(getResources().getQuantityString(R.plurals.message_participants, numUsers, numUsers));
     }
 
-    private void addMessage(String username, String message) {
+    private void addMessage(String username, String message, String lang) {
         mMessages.add(new Message.Builder(Message.TYPE_MESSAGE)
                 .username(username).message(message).build());
         mAdapter.notifyItemInserted(mMessages.size() - 1);
@@ -297,7 +324,7 @@ public class MainFragment extends Fragment {
         }
 
         mInputMessageView.setText("");
-        addMessage(mUsername, message);
+        addMessage(mUsername, message, langs);
 
         // perform the sending message attempt.
         mSocket.emit("new message", message);
@@ -326,8 +353,8 @@ public class MainFragment extends Fragment {
             getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    if(!isConnected) {
-                        if(null!=mUsername)
+                    if (!isConnected) {
+                        if (null != mUsername)
                             mSocket.emit("add user", mUsername);
                         Toast.makeText(getActivity().getApplicationContext(),
                                 R.string.connect, Toast.LENGTH_LONG).show();
@@ -376,16 +403,23 @@ public class MainFragment extends Fragment {
                     JSONObject data = (JSONObject) args[0];
                     String username;
                     String message;
+                    String lang;
                     try {
                         username = data.getString("username");
                         message = data.getString("message");
+                        lang = data.getString("lang");
                     } catch (JSONException e) {
                         Log.e(TAG, e.getMessage());
                         return;
                     }
 
                     removeTyping(username);
-                    addMessage(username, message);
+                    addMessage(username, message, lang);
+                    //TODO: Text to Speech here
+                    if (mImageSpeak)
+                        speakOut(message);
+
+
                 }
             });
         }
@@ -495,13 +529,12 @@ public class MainFragment extends Fragment {
         Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
         //You can set here own local Language.
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.US);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, langs);
         intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "I am listening...");
         try {
             startActivityForResult(intent, REQ_CODE_VOICE_IN);
-        }
-        catch (ActivityNotFoundException a) {
-            Toast.makeText(requireActivity(),a.toString(),Toast.LENGTH_SHORT).show();
+        } catch (ActivityNotFoundException a) {
+            Toast.makeText(requireActivity(), a.toString(), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -511,10 +544,10 @@ public class MainFragment extends Fragment {
         if (connMgr != null) {
             networkInfo = connMgr.getActiveNetworkInfo();
         }
-        if(networkInfo != null && networkInfo.isConnected())
+        if (networkInfo != null && networkInfo.isConnected())
             return true;
         else {
-            Toast.makeText(requireActivity(),"Check network connection.",Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireActivity(), "Check network connection.", Toast.LENGTH_SHORT).show();
             return false;
         }
     }
@@ -527,6 +560,56 @@ public class MainFragment extends Fragment {
         editText.setText(text);
         if (focussed) {
             editText.requestFocus();
+        }
+    }
+
+
+    @Override
+    public void onInit(int status) {
+        if (status == TextToSpeech.SUCCESS) {
+            int result = mTextToSpeech.setLanguage(new Locale("en"));
+            if (result == TextToSpeech.LANG_MISSING_DATA) {
+                Toast.makeText(requireContext(), getString(R.string.language_pack_missing), Toast.LENGTH_SHORT).show();
+            } else if (result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                Toast.makeText(requireContext(), getString(R.string.language_not_supported), Toast.LENGTH_SHORT).show();
+            }
+
+            mImageSpeak = true;
+
+            mTextToSpeech.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                @Override
+                public void onStart(String utteranceId) {
+                    Log.e("Inside", "OnStart");
+                }
+
+                @Override
+                public void onDone(String utteranceId) {
+                }
+
+                @Override
+                public void onError(String utteranceId) {
+                }
+            });
+        } else {
+            Log.e("", "TTS Initilization Failed");
+        }
+    }
+
+    //  TEXT TO SPEECH ACTION
+    @SuppressWarnings("deprecation")
+    private void speakOut(String msg) {
+        int result = mTextToSpeech.setLanguage(new Locale(langs));
+        Log.e("Inside", "speakOut " + langs + " " + result);
+        if (result == TextToSpeech.LANG_MISSING_DATA) {
+            Toast.makeText(requireContext(), getString(R.string.language_pack_missing), Toast.LENGTH_SHORT).show();
+            Intent installIntent = new Intent();
+            installIntent.setAction(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA);
+            startActivity(installIntent);
+        } else if (result == TextToSpeech.LANG_NOT_SUPPORTED) {
+            Toast.makeText(requireContext(), getString(R.string.language_not_supported), Toast.LENGTH_SHORT).show();
+        } else {
+            map.put(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "UniqueID");
+            mTextToSpeech.speak(msg, TextToSpeech.QUEUE_FLUSH, map);
         }
     }
 }

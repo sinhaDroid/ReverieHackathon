@@ -53,5 +53,4 @@
         android:background="@android:drawable/presence_audio_busy"
         android:layout_gravity="center"
         android:layout_marginBottom="10dp"/>
-
 </LinearLayout>

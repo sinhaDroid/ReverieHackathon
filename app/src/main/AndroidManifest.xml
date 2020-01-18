@@ -18,7 +18,8 @@
         android:theme="@style/AppTheme">
         <activity
             android:name="com.github.nkzawa.socketio.androidchat.MainActivity"
-            android:label="@string/app_name">
+            android:screenOrientation="portrait"
+            android:label="@string/app_name" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -27,6 +28,7 @@
         <activity
             android:name="com.github.nkzawa.socketio.androidchat.LoginActivity"
             android:label="@string/title_activity_login"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat"
             android:windowSoftInputMode="adjustResize|stateVisible"></activity>
         <activity

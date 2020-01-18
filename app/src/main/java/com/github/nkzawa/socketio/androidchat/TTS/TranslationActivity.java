@@ -59,21 +59,21 @@ public class TranslationActivity extends AppCompatActivity implements TextToSpee
         setContentView(R.layout.activity_translation);
 
         activityRunning = true;
-        TextView mEmptyTextView = (TextView) findViewById(R.id.empty_view_not_connected);
-        mSpinnerLanguageFrom = (Spinner) findViewById(R.id.spinner_language_from);
-        mSpinnerLanguageTo = (Spinner) findViewById(R.id.spinner_language_to);
-        Button mButtonTranslate = (Button) findViewById(R.id.button_translate);         //      Translate button to translate text
-        ImageView mImageSwap = (ImageView) findViewById(R.id.image_swap);               //      Swap Language button to swap languages
-        ImageView mImageListen = (ImageView) findViewById(R.id.image_listen);           //      Mic button for Speech to text
-        mImageSpeak = (ImageView) findViewById(R.id.image_speak);
-        ImageView mClearText = (ImageView) findViewById(R.id.clear_text);               //      Clear button to clear text fields
-        mTextInput = (EditText) findViewById(R.id.text_input);
-        mTextTranslated = (TextView) findViewById(R.id.text_translated);
+        TextView mEmptyTextView = findViewById(R.id.empty_view_not_connected);
+        mSpinnerLanguageFrom = findViewById(R.id.spinner_language_from);
+        mSpinnerLanguageTo = findViewById(R.id.spinner_language_to);
+        Button mButtonTranslate = findViewById(R.id.button_translate);         //      Translate button to translate text
+        ImageView mImageSwap = findViewById(R.id.image_swap);               //      Swap Language button to swap languages
+        ImageView mImageListen = findViewById(R.id.image_listen);           //      Mic button for Speech to text
+        mImageSpeak = findViewById(R.id.image_speak);
+        ImageView mClearText = findViewById(R.id.clear_text);               //      Clear button to clear text fields
+        mTextInput = findViewById(R.id.text_input);
+        mTextTranslated = findViewById(R.id.text_translated);
         mTextTranslated.setMovementMethod(new ScrollingMovementMethod());
         process_tts = new Dialog(TranslationActivity.this);
         process_tts.setContentView(R.layout.dialog_processing_tts);
         process_tts.setTitle(getString(R.string.process_tts));
-        TextView title = (TextView) process_tts.findViewById(android.R.id.title);
+        TextView title = process_tts.findViewById(android.R.id.title);
         // title.setSingleLine(false);
         mTextToSpeech = new TextToSpeech(this, this);
 
@@ -192,7 +192,7 @@ public class TranslationActivity extends AppCompatActivity implements TextToSpee
                     final Dialog match_text_dialog = new Dialog(TranslationActivity.this);
                     match_text_dialog.setContentView(R.layout.dialog_matches_frag);
                     match_text_dialog.setTitle(getString(R.string.select_matching_text));
-                    ListView textlist = (ListView) match_text_dialog.findViewById(R.id.list);
+                    ListView textlist = match_text_dialog.findViewById(R.id.list);
                     final ArrayList<String> matches_text = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
                     ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, matches_text);
                     textlist.setAdapter(adapter);
