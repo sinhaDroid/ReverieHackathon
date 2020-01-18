@@ -43,7 +43,7 @@ import java.util.Locale;
 import io.socket.client.Socket;
 import io.socket.emitter.Emitter;
 
-import static android.app.Activity.RESULT_OK;
+import static android.support.v7.app.AppCompatActivity.RESULT_OK;
 
 
 /**
@@ -89,8 +89,6 @@ public class MainFragment extends Fragment implements TextToSpeech.OnInitListene
     public void onAttach(Context context) {
         super.onAttach(context);
         mAdapter = new MessageAdapter(context, mMessages);
-        if (context instanceof Activity) {
-            //this.listener = (MainActivity) context;
         }
     }
 

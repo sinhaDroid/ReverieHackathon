@@ -12,12 +12,12 @@
         android:layout_width="300dp"
         android:layout_height="100dp"
         android:layout_centerVertical="true"
-        android:src="@drawable/yandex_logo"
+        app:srcCompat="@drawable/yandex_logo"
         android:contentDescription="TODO" />
     <ImageView
         android:layout_width="64dp"
         android:layout_height="64dp"
-        android:src="@drawable/translate_logo"
+        app:srcCompat="@drawable/translate_logo"
         android:layout_marginRight="15dp"
         android:layout_marginEnd="15dp"
         android:layout_centerVertical="true"

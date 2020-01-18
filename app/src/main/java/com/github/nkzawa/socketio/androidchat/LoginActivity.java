@@ -1,11 +1,11 @@
 package com.github.nkzawa.socketio.androidchat;
 
-import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -39,7 +39,7 @@ import static com.github.nkzawa.socketio.androidchat.TTS.GlobalVars.LANGUAGE_COD
 /**
  * A login screen that offers login via username.
  */
-public class LoginActivity extends Activity {
+public class LoginActivity extends AppCompatActivity {
 
     private EditText mUsernameView;
     private Spinner spinner;
