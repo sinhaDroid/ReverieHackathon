@@ -11,10 +11,15 @@ import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
-import io.socket.client.Socket;
-import io.socket.emitter.Emitter;
+
+import com.github.nkzawa.socketio.androidchat.TTS.ConversationActivity;
+import com.github.nkzawa.socketio.androidchat.TTS.TranslationActivity;
+
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import io.socket.client.Socket;
+import io.socket.emitter.Emitter;
 
 
 /**
@@ -58,6 +63,24 @@ public class LoginActivity extends Activity {
         });
 
         mSocket.on("login", onLogin);
+
+        Button bConversation = (Button) findViewById(R.id.start_new_conversation);
+        bConversation.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = new Intent(LoginActivity.this, ConversationActivity.class);
+                startActivity(intent);
+            }
+        });
+
+        Button bTranslation = (Button) findViewById(R.id.start_new_translation);
+        bTranslation.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = new Intent(LoginActivity.this, TranslationActivity.class);
+                startActivity(intent);
+            }
+        });
     }
 
     @Override
