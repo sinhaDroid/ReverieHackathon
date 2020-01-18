@@ -47,6 +47,11 @@
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value=".MainActivity" />
         </activity>
+        <activity
+        android:name=".bluetoothchat.BluetoothActivity"
+        android:configChanges="orientation|keyboardHidden"
+        android:label="@string/app_name">
+    </activity>
     </application>
 
 </manifest>

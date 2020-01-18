@@ -18,14 +18,15 @@ package com.github.nkzawa.socketio.androidchat.bluetoothchat;
 
 import android.app.ActionBar;
 import android.app.Activity;
-import android.app.Fragment;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentActivity;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -42,10 +43,8 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
-
-import com.example.android.common.logger.Log;
 import com.github.nkzawa.socketio.androidchat.R;
+import com.github.nkzawa.socketio.androidchat.common.logger.Log;
 
 /**
  * This fragment controls Bluetooth to communicate with other devices.

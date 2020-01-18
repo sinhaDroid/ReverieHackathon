@@ -23,8 +23,6 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.ViewAnimator;
 
-import androidx.fragment.app.Fragment;
-
 import com.github.nkzawa.socketio.androidchat.R;
 import com.github.nkzawa.socketio.androidchat.common.activities.SampleActivityBase;
 import com.github.nkzawa.socketio.androidchat.common.logger.Log;
@@ -34,7 +32,6 @@ import com.github.nkzawa.socketio.androidchat.common.logger.MessageOnlyLogFilter
 
 /**
  * A simple launcher activity containing a summary sample description, sample log and a custom
- * {@link Fragment} which can display a view.
  * <p>
  * For devices with displays with a width of 720dp or greater, the sample log is always visible,
  * on other devices it's visibility is controlled by an item on the Action Bar.
@@ -76,17 +73,16 @@ public class BluetoothActivity extends SampleActivityBase {
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.menu_toggle_log:
-                mLogShown = !mLogShown;
-                ViewAnimator output = findViewById(R.id.sample_output);
-                if (mLogShown) {
-                    output.setDisplayedChild(1);
-                } else {
-                    output.setDisplayedChild(0);
-                }
-                invalidateOptionsMenu();
-                return true;
+        if (item.getItemId() == R.id.menu_toggle_log) {
+            mLogShown = !mLogShown;
+            ViewAnimator output = findViewById(R.id.sample_output);
+            if (mLogShown) {
+                output.setDisplayedChild(1);
+            } else {
+                output.setDisplayedChild(0);
+            }
+            invalidateOptionsMenu();
+            return true;
         }
         return super.onOptionsItemSelected(item);
     }
@@ -108,7 +104,9 @@ public class BluetoothActivity extends SampleActivityBase {
         // On screen logging via a fragment with a TextView.
         LogFragment logFragment = (LogFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.log_fragment);
-        msgFilter.setNext(logFragment.getLogView());
+        if (logFragment != null) {
+            msgFilter.setNext(logFragment.getLogView());
+        }
 
         Log.i(TAG, "Ready");
     }
