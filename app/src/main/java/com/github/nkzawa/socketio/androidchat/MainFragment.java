@@ -1,10 +1,14 @@
 package com.github.nkzawa.socketio.androidchat;
 
 import android.app.Activity;
+import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.os.Handler;
+import android.speech.RecognizerIntent;
 import android.support.v4.app.Fragment;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -22,6 +26,7 @@ import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -30,9 +35,12 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import io.socket.client.Socket;
 import io.socket.emitter.Emitter;
+
+import static android.app.Activity.RESULT_OK;
 
 
 /**
@@ -46,6 +54,8 @@ public class MainFragment extends Fragment {
 
     private static final int TYPING_TIMER_LENGTH = 600;
 
+    private static final int REQ_CODE_VOICE_IN = 143;
+
     private RecyclerView mMessagesView;
     private EditText mInputMessageView;
     private List<Message> mMessages = new ArrayList<Message>();
@@ -56,6 +66,7 @@ public class MainFragment extends Fragment {
     private Socket mSocket;
 
     private Boolean isConnected = true;
+    private boolean isUsedOnce=false;
 
     public MainFragment() {
         super();
@@ -170,21 +181,50 @@ public class MainFragment extends Fragment {
                 attemptSend();
             }
         });
+
+        ImageView img_convert=(ImageView) view.findViewById(R.id.id_convert);
+        img_convert.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(isOnline()){
+                    /*if (!isUsedOnce){
+                        txt_greeting.setVisibility(View.GONE);
+                        linearLayout.setVisibility(View.VISIBLE);
+                    }*/
+                    startVoiceToTextService();
+                }
+            }
+        });
     }
 
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (Activity.RESULT_OK != resultCode) {
-            getActivity().finish();
-            return;
+        if (requestCode == REQ_CODE_VOICE_IN) {
+            if (resultCode == RESULT_OK && null != data) {
+                ArrayList<String> result = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+                String voiceText = result.get(0);
+                updateText(mInputMessageView, voiceText);
+//                mInputMessageView.setText(voiceText);
+
+                if (!mInputMessageView.getText().toString().equals("")) {
+                    attemptSend();
+                } else {
+                    Toast.makeText(getActivity(), "Enter input...", Toast.LENGTH_SHORT).show();
+                }
+            }
+        } else {
+            if (RESULT_OK != resultCode) {
+                requireActivity().finish();
+                return;
+            }
+
+            mUsername = data.getStringExtra("username");
+            int numUsers = data.getIntExtra("numUsers", 1);
+
+            addLog(getResources().getString(R.string.message_welcome));
+            addParticipantsLog(numUsers);
         }
-
-        mUsername = data.getStringExtra("username");
-        int numUsers = data.getIntExtra("numUsers", 1);
-
-        addLog(getResources().getString(R.string.message_welcome));
-        addParticipantsLog(numUsers);
     }
 
     @Override
@@ -449,5 +489,45 @@ public class MainFragment extends Fragment {
             mSocket.emit("stop typing");
         }
     };
+
+    //voice
+    private void startVoiceToTextService() {
+        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        //You can set here own local Language.
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.US);
+        intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "I am listening...");
+        try {
+            startActivityForResult(intent, REQ_CODE_VOICE_IN);
+        }
+        catch (ActivityNotFoundException a) {
+            Toast.makeText(requireActivity(),a.toString(),Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    public boolean isOnline() {
+        ConnectivityManager connMgr = (ConnectivityManager) requireActivity().getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo networkInfo = null;
+        if (connMgr != null) {
+            networkInfo = connMgr.getActiveNetworkInfo();
+        }
+        if(networkInfo != null && networkInfo.isConnected())
+            return true;
+        else {
+            Toast.makeText(requireActivity(),"Check network connection.",Toast.LENGTH_SHORT).show();
+            return false;
+        }
+    }
+
+    private void updateText(EditText editText, String text) {
+        boolean focussed = editText.hasFocus();
+        if (focussed) {
+            editText.clearFocus();
+        }
+        editText.setText(text);
+        if (focussed) {
+            editText.requestFocus();
+        }
+    }
 }
 
